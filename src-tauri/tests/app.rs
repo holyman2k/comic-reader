@@ -98,3 +98,21 @@ fn shutdown_clears_book_and_removes_temp_folder() {
     assert!(state.current().is_none());
     assert!(!inst_path.exists());
 }
+
+#[test]
+fn close_book_clears_book_and_cancels_pending_open() {
+    let base = temp_base();
+    let state = AppState::new(InstanceDir::create(base.path()).unwrap());
+    let book_dir = folder_with(&[("a.png", png(1, 1))]);
+
+    let t1 = state.next_ticket();
+    assert!(state.install(Book::open(book_dir.path(), t1, state.temp_base()).unwrap()));
+    // An open request is still running when the window closes.
+    let t2 = state.next_ticket();
+    state.close_book();
+    assert!(state.current().is_none());
+    assert!(!state.install(Book::open(book_dir.path(), t2, state.temp_base()).unwrap()));
+    assert!(state.current().is_none());
+    // The instance folder stays for books opened in a new window.
+    assert!(state.temp_base().exists());
+}

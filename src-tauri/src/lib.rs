@@ -14,6 +14,25 @@ use state::AppState;
 use tauri::Emitter;
 use tauri::Manager;
 
+#[cfg(target_os = "macos")]
+const MAIN_WINDOW: &str = "main";
+
+/// Shows the main window. Makes a new empty one if the user closed it.
+#[cfg(target_os = "macos")]
+fn open_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        return;
+    }
+    let Some(config) = app.config().app.windows.iter().find(|w| w.label == MAIN_WINDOW) else {
+        return;
+    };
+    if let Err(e) = tauri::WebviewWindowBuilder::from_config(app, config).and_then(|b| b.build()) {
+        eprintln!("could not open window: {e}");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let base = temp::default_base();
@@ -44,9 +63,22 @@ pub fn run() {
         tauri::RunEvent::Opened { urls } => {
             if let Some(path) = urls.iter().find_map(|url| url.to_file_path().ok()) {
                 app.state::<PendingOpen>().set(path.to_string_lossy().into_owned());
-                let _ = app.emit(launch_open::OPEN_EVENT, ());
+                // A new window takes the pending path when its UI loads.
+                if app.get_webview_window(MAIN_WINDOW).is_none() {
+                    open_main_window(app);
+                } else {
+                    let _ = app.emit(launch_open::OPEN_EVENT, ());
+                }
             }
         }
+        // On macOS the app stays open after its last window closes.
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::ExitRequested { code: None, api, .. } => {
+            api.prevent_exit();
+            app.state::<AppState>().close_book();
+        }
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen { .. } => open_main_window(app),
         tauri::RunEvent::Exit => app.state::<AppState>().shutdown(),
         _ => {}
     });

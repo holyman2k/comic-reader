@@ -51,6 +51,13 @@ impl AppState {
         self.current.lock().unwrap().clone()
     }
 
+    /// Drops the current book and cancels open requests that are still running.
+    pub fn close_book(&self) {
+        let mut current = self.current.lock().unwrap();
+        self.next_ticket();
+        current.take();
+    }
+
     pub fn shutdown(&self) {
         self.current.lock().unwrap().take();
         if let Some(instance) = self.instance.lock().unwrap().take() {
