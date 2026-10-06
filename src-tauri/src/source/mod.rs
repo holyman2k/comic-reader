@@ -1,8 +1,10 @@
 //! Page sources: a folder, a zip, or an archive extracted to a temporary folder.
 
 mod folder;
+mod zip_source;
 
 pub use folder::FolderSource;
+pub use zip_source::ZipSource;
 
 use std::fmt;
 use std::fs::File;
@@ -116,6 +118,7 @@ pub fn safe_relative_path(name: &str) -> Option<PathBuf> {
 pub fn open_source(path: &Path, _temp_base: &Path) -> Result<Box<dyn PageSource>, SourceError> {
     match detect(path)? {
         SourceKind::Folder => Ok(Box::new(FolderSource::new(path))),
+        SourceKind::Zip => Ok(Box::new(ZipSource::open(path)?)),
         _ => Err(SourceError::Unsupported),
     }
 }

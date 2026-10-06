@@ -76,3 +76,74 @@ fn detect_missing_file_is_io_error() {
     let dir = tempfile::tempdir().unwrap();
     assert!(matches!(detect(&dir.path().join("gone.cbz")), Err(SourceError::Io(_))));
 }
+
+fn write_file(dir: &std::path::Path, name: &str, data: &[u8]) -> std::path::PathBuf {
+    let path = dir.join(name);
+    std::fs::write(&path, data).unwrap();
+    path
+}
+
+#[test]
+fn zip_lists_files_and_reads_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = write_file(
+        dir.path(),
+        "book.cbz",
+        &zip_bytes(&[("p1.png", png(1, 2)), ("ch1/p2.png", png(3, 4))]),
+    );
+    let base = temp_base();
+    let source = open_source(&path, base.path()).unwrap();
+    assert_eq!(sorted_list(source.as_ref()), ["ch1/p2.png", "p1.png"]);
+    assert_eq!(source.read("ch1/p2.png").unwrap(), png(3, 4));
+    assert_eq!(source.read_prefix("p1.png", 4).unwrap(), png(1, 2)[..4].to_vec());
+    assert!(matches!(source.read("missing.png"), Err(SourceError::NotFound(_))));
+}
+
+#[test]
+fn zip_backslash_names_become_folders() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = write_file(
+        dir.path(),
+        "win.zip",
+        &zip_bytes(&[("ch1\\p2.png", png(3, 4)), (".\\p1.png", png(1, 2))]),
+    );
+    let base = temp_base();
+    let source = open_source(&path, base.path()).unwrap();
+    assert_eq!(sorted_list(source.as_ref()), ["ch1/p2.png", "p1.png"]);
+    assert_eq!(source.read("ch1/p2.png").unwrap(), png(3, 4));
+}
+
+#[test]
+fn zip_with_wrong_extension_opens_as_zip() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = write_file(dir.path(), "mislabeled.cbr", &zip_bytes(&[("p1.png", png(1, 2))]));
+    let base = temp_base();
+    let source = open_source(&path, base.path()).unwrap();
+    assert_eq!(source.list().unwrap(), ["p1.png"]);
+}
+
+#[test]
+fn zip_encrypted_is_reported() {
+    use std::io::Write;
+    use zip::unstable::write::FileOptionsExt;
+    let mut w = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let options = zip::write::SimpleFileOptions::default()
+        .with_deprecated_encryption(b"secret")
+        .unwrap();
+    w.start_file("p1.png", options).unwrap();
+    w.write_all(&png(1, 2)).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let path = write_file(dir.path(), "locked.cbz", &w.finish().unwrap().into_inner());
+    let base = temp_base();
+    assert!(matches!(open_source(&path, base.path()), Err(SourceError::Encrypted)));
+}
+
+#[test]
+fn zip_damaged_is_corrupt() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut data = zip_bytes(&[("p1.png", png(1, 2))]);
+    data.truncate(data.len() - 30); // cut into the central directory
+    let path = write_file(dir.path(), "broken.cbz", &data);
+    let base = temp_base();
+    assert!(matches!(open_source(&path, base.path()), Err(SourceError::Corrupt(_))));
+}
