@@ -1,3 +1,4 @@
+pub mod image_entry;
 pub mod natural_sort;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
