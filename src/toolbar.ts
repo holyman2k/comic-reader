@@ -13,7 +13,11 @@ function byId(id: string): HTMLElement {
 }
 
 function bind(selector: string, handler: () => void): void {
-  document.querySelectorAll<HTMLElement>(selector).forEach((el) => el.addEventListener("click", handler));
+  document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+    // Keep focus on the page scroller so Space and Enter do not re-click the button.
+    el.addEventListener("mousedown", (e) => e.preventDefault());
+    el.addEventListener("click", handler);
+  });
 }
 
 export function setupToolbar(h: ToolbarHandlers): void {

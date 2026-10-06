@@ -62,6 +62,7 @@ export class Viewer {
     this.column.appendChild(fragment);
     this.pages.forEach((el) => this.observer.observe(el));
     this.scroller.scrollTo(0, 0);
+    this.scroller.focus({ preventScroll: true });
     this.lastWidth = this.scroller.clientWidth;
     this.scheduleUpdate();
   }

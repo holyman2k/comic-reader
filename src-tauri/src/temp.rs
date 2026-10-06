@@ -44,7 +44,7 @@ pub fn default_base() -> PathBuf {
 /// `cleanup_stale` between those steps, see an unlocked folder, and delete it.
 /// The lock is released when the returned file is dropped.
 fn lock_base(base: &Path) -> io::Result<File> {
-    let file = OpenOptions::new().write(true).create(true).open(base.join(CREATE_LOCK))?;
+    let file = OpenOptions::new().write(true).create(true).truncate(false).open(base.join(CREATE_LOCK))?;
     file.lock()?;
     Ok(file)
 }

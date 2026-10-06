@@ -42,4 +42,4 @@ npm run tauri build
 - macOS: `src-tauri/target/release/bundle/dmg/`
 - Windows: `src-tauri/target/release/bundle/msi/` and `bundle/nsis/`
 
-The app is not signed. On macOS, right-click the app and choose Open the first time.
+The app is not signed. On macOS 15 and later, the first launch is blocked. Open System Settings > Privacy & Security and click "Open Anyway".

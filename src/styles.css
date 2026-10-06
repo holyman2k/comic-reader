@@ -49,6 +49,7 @@ button:hover { background: #34373d; }
 #counter { min-width: 70px; text-align: right; color: var(--muted); }
 
 #scroller { position: relative; flex: 1; overflow: auto; }
+#scroller:focus { outline: none; }
 #pages { width: calc(var(--zoom) * 1%); margin: 0 auto; }
 
 .page { position: relative; width: 100%; background: #1a1b1e; }

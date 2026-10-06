@@ -35,6 +35,7 @@ const fullscreen = new Fullscreen();
 const status = byId("status");
 let zoom = loadZoom(storage);
 let statusTimer = 0;
+let shownBookId = -1;
 
 function showStatus(text: string, isError = false): void {
   window.clearTimeout(statusTimer);
@@ -57,6 +58,8 @@ export async function openPath(path: string): Promise<void> {
   showStatus(openingLabel(path));
   try {
     const book = await invoke<BookInfo>("open_book", { path });
+    if (book.bookId < shownBookId) return; // a newer open already owns the viewer and status
+    shownBookId = book.bookId;
     hideStatus();
     viewer.show(book);
     document.body.classList.add("has-book");
