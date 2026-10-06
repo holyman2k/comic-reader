@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 const PREFIX: &str = "inst-";
 const LOCK_FILE: &str = ".lock";
+const CREATE_LOCK: &str = ".create.lock";
 
 pub struct InstanceDir {
     path: PathBuf,
@@ -15,6 +16,7 @@ pub struct InstanceDir {
 impl InstanceDir {
     pub fn create(base: &Path) -> io::Result<Self> {
         fs::create_dir_all(base)?;
+        let _guard = lock_base(base)?;
         let path = tempfile::Builder::new().prefix(PREFIX).tempdir_in(base)?.keep();
         let lock = File::create(path.join(LOCK_FILE))?;
         lock.try_lock().map_err(|e| io::Error::other(e.to_string()))?;
@@ -37,6 +39,16 @@ pub fn default_base() -> PathBuf {
     std::env::temp_dir().join("comic-reader")
 }
 
+/// Takes the exclusive base lock. `create` makes the folder, makes `.lock` and
+/// locks it in three steps. Without this lock, a second instance could run
+/// `cleanup_stale` between those steps, see an unlocked folder, and delete it.
+/// The lock is released when the returned file is dropped.
+fn lock_base(base: &Path) -> io::Result<File> {
+    let file = OpenOptions::new().write(true).create(true).open(base.join(CREATE_LOCK))?;
+    file.lock()?;
+    Ok(file)
+}
+
 fn is_unlocked(dir: &Path) -> bool {
     match OpenOptions::new().write(true).open(dir.join(LOCK_FILE)) {
         Err(_) => true,
@@ -46,6 +58,10 @@ fn is_unlocked(dir: &Path) -> bool {
 
 /// Deletes instance folders left behind by app instances that are no longer running.
 pub fn cleanup_stale(base: &Path) {
+    if !base.is_dir() {
+        return;
+    }
+    let Ok(_guard) = lock_base(base) else { return };
     let Ok(entries) = fs::read_dir(base) else { return };
     for entry in entries.flatten() {
         let path = entry.path();
@@ -91,6 +107,15 @@ mod tests {
         assert!(!stale.exists());
         assert!(!no_lock.exists());
         assert!(other.is_dir());
+        assert!(base.path().join(CREATE_LOCK).exists());
+    }
+
+    #[test]
+    fn create_after_cleanup_succeeds_and_is_locked() {
+        let base = tempfile::tempdir().unwrap();
+        cleanup_stale(base.path());
+        let inst = InstanceDir::create(base.path()).unwrap();
+        assert!(!is_unlocked(inst.path()));
     }
 
     #[test]
@@ -106,6 +131,8 @@ mod tests {
     #[test]
     fn cleanup_of_missing_base_does_nothing() {
         let base = tempfile::tempdir().unwrap();
-        cleanup_stale(&base.path().join("does-not-exist"));
+        let missing = base.path().join("does-not-exist");
+        cleanup_stale(&missing);
+        assert!(!missing.exists());
     }
 }
