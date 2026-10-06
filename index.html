@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Comic Reader</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <header id="toolbar">
+      <button id="open-file">Open File</button>
+      <button id="open-folder">Open Folder</button>
+      <span class="spacer"></span>
+      <button id="zoom-out" title="Zoom out">−</button>
+      <span id="zoom-label">100%</span>
+      <button id="zoom-in" title="Zoom in">+</button>
+      <button id="fullscreen" title="Full screen">Full Screen</button>
+      <span id="counter"></span>
+    </header>
+    <main id="scroller">
+      <div id="empty">
+        <p>Drop a comic or folder here</p>
+        <div>
+          <button data-open="file">Open File</button>
+          <button data-open="folder">Open Folder</button>
+        </div>
+      </div>
+      <div id="pages"></div>
+    </main>
+    <div id="counter-overlay"></div>
+    <div id="status" hidden></div>
+    <div id="drop-highlight" hidden>Drop to open</div>
+  </body>
+</html>
