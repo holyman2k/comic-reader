@@ -1,3 +1,4 @@
+pub mod book;
 pub mod image_entry;
 pub mod natural_sort;
 pub mod source;
