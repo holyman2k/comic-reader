@@ -122,7 +122,7 @@ pub fn open_source(path: &Path, temp_base: &Path) -> Result<Box<dyn PageSource>,
         SourceKind::Folder => Ok(Box::new(FolderSource::new(path))),
         SourceKind::Zip => Ok(Box::new(ZipSource::open(path)?)),
         SourceKind::TarGz => Ok(Box::new(ExtractedSource::from_tar_gz(path, temp_base)?)),
-        SourceKind::Rar => Err(SourceError::Unsupported),
+        SourceKind::Rar => Ok(Box::new(ExtractedSource::from_rar(path, temp_base)?)),
     }
 }
 

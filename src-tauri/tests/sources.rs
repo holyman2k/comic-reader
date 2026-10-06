@@ -221,3 +221,45 @@ fn damaged_tar_gz_is_corrupt() {
     let base = temp_base();
     assert!(matches!(open_source(&path, base.path()), Err(SourceError::Corrupt(_))));
 }
+
+#[test]
+fn rar_extracts_only_pages() {
+    for name in ["book.rar", "book.cbr"] {
+        let base = temp_base();
+        let source = open_source(&fixture(name), base.path()).unwrap();
+        assert_eq!(
+            sorted_list(source.as_ref()),
+            ["ch10/page 1.png", "ch2/page 10.png", "ch2/page 2.png"],
+            "{name}"
+        );
+        let bytes = source.read("ch2/page 2.png").unwrap();
+        assert!(bytes.starts_with(b"\x89PNG"), "{name}");
+    }
+}
+
+#[test]
+fn rar_encrypted_is_reported() {
+    for name in ["encrypted-files.rar", "encrypted-headers.rar"] {
+        let base = temp_base();
+        assert!(
+            matches!(open_source(&fixture(name), base.path()), Err(SourceError::Encrypted)),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn rar_damaged_is_corrupt_or_incomplete() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut data = std::fs::read(fixture("book.rar")).unwrap();
+    data.truncate(data.len() / 2);
+    let path = write_file(dir.path(), "broken.rar", &data);
+    let base = temp_base();
+    // UnRAR may report bad data, or may stop at the cut as if the archive ended.
+    // Either is acceptable; a crash, an I/O error, or all 3 pages is not.
+    match open_source(&path, base.path()) {
+        Err(SourceError::Corrupt(_)) => {}
+        Ok(source) => assert!(source.list().unwrap().len() < 3),
+        Err(other) => panic!("expected Corrupt, got {other}"),
+    }
+}

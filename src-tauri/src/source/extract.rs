@@ -19,6 +19,12 @@ impl ExtractedSource {
         Ok(Self::wrap(dir))
     }
 
+    pub fn from_rar(archive: &Path, temp_base: &Path) -> Result<Self, SourceError> {
+        let dir = new_book_dir(temp_base)?;
+        extract_rar(archive, dir.path())?;
+        Ok(Self::wrap(dir))
+    }
+
     fn wrap(dir: TempDir) -> Self {
         let inner = FolderSource::new(dir.path());
         Self { _dir: dir, inner }
@@ -81,6 +87,39 @@ fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<(), SourceError> {
         if let Some(target) = target_for(dest, &name) {
             write_reader(&target, &mut entry).map_err(tar_error)?;
         }
+    }
+    Ok(())
+}
+
+fn rar_error(err: unrar::error::UnrarError) -> SourceError {
+    use unrar::error::Code;
+    match err.code {
+        Code::MissingPassword | Code::BadPassword => SourceError::Encrypted,
+        Code::EOpen | Code::ECreate | Code::EWrite | Code::ERead | Code::EClose => {
+            SourceError::Io(io::Error::other(err.to_string()))
+        }
+        _ => SourceError::Corrupt(err.to_string()),
+    }
+}
+
+/// RAR has no random access (solid archives), so entries are processed front to back.
+fn extract_rar(archive: &Path, dest: &Path) -> Result<(), SourceError> {
+    let mut cursor = unrar::Archive::new(archive).open_for_processing().map_err(rar_error)?;
+    while let Some(header) = cursor.read_header().map_err(rar_error)? {
+        let entry = header.entry();
+        let target = if entry.is_file() {
+            target_for(dest, &entry.filename.to_string_lossy())
+        } else {
+            None
+        };
+        cursor = match target {
+            Some(target) => {
+                let (data, next) = header.read().map_err(rar_error)?;
+                write_reader(&target, &mut data.as_slice())?;
+                next
+            }
+            None => header.skip().map_err(rar_error)?,
+        };
     }
     Ok(())
 }
