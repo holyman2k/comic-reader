@@ -89,8 +89,14 @@ pub fn detect(path: &Path) -> Result<SourceKind, SourceError> {
         .ok_or(SourceError::Unsupported)
 }
 
+fn is_drive_prefix(seg: &str) -> bool {
+    let b = seg.as_bytes();
+    b.len() == 2 && b[0].is_ascii_alphabetic() && b[1] == b':'
+}
+
 /// Converts an entry name to a relative path. Returns `None` for absolute
-/// paths, drive prefixes, `..` segments, and empty names.
+/// paths, drive-prefix segments (`C:`), `..` segments, and empty names.
+/// Other colons are allowed, except on Windows where they are invalid in names.
 pub fn safe_relative_path(name: &str) -> Option<PathBuf> {
     if name.starts_with('/') || name.starts_with('\\') {
         return None;
@@ -100,7 +106,7 @@ pub fn safe_relative_path(name: &str) -> Option<PathBuf> {
         match seg {
             "" | "." => continue,
             ".." => return None,
-            s if s.contains(':') => return None,
+            s if is_drive_prefix(s) || (cfg!(windows) && s.contains(':')) => return None,
             s => out.push(s),
         }
     }
@@ -150,5 +156,12 @@ mod tests {
         assert_eq!(safe_relative_path("\\windows\\x.png"), None);
         assert_eq!(safe_relative_path("C:/x.png"), None);
         assert_eq!(safe_relative_path("./"), None);
+        assert_eq!(safe_relative_path("a/C:/x.png"), None);
+        if !cfg!(windows) {
+            assert_eq!(
+                safe_relative_path("Re:Zero/p1.png"),
+                Some(PathBuf::from("Re:Zero").join("p1.png"))
+            );
+        }
     }
 }

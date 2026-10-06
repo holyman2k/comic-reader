@@ -43,6 +43,17 @@ fn folder_rejects_unsafe_and_missing_paths() {
     assert!(matches!(source.read("missing.png"), Err(SourceError::NotFound(_))));
 }
 
+#[cfg(not(windows))]
+#[test]
+fn folder_reads_names_with_colons() {
+    let dir = tempfile::tempdir().unwrap();
+    write_folder(dir.path(), &[("Re:Zero/p1.png", png(1, 2))]);
+    let base = temp_base();
+    let source = open_source(dir.path(), base.path()).unwrap();
+    assert_eq!(sorted_list(source.as_ref()), ["Re:Zero/p1.png"]);
+    assert_eq!(source.read("Re:Zero/p1.png").unwrap(), png(1, 2));
+}
+
 #[test]
 fn detect_prefers_magic_bytes_over_extension() {
     let dir = tempfile::tempdir().unwrap();
