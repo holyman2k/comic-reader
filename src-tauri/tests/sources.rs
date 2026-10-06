@@ -147,3 +147,77 @@ fn zip_damaged_is_corrupt() {
     let base = temp_base();
     assert!(matches!(open_source(&path, base.path()), Err(SourceError::Corrupt(_))));
 }
+
+#[test]
+fn tar_gz_extracts_only_pages() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = write_file(
+        dir.path(),
+        "book.tar.gz",
+        &tar_gz_bytes(&[
+            ("ch1/p2.png", png(3, 4)),
+            ("p1.png", png(1, 2)),
+            ("notes.txt", b"not a page".to_vec()),
+        ]),
+    );
+    let base = temp_base();
+    let source = open_source(&path, base.path()).unwrap();
+    assert_eq!(sorted_list(source.as_ref()), ["ch1/p2.png", "p1.png"]);
+    assert_eq!(source.read("ch1/p2.png").unwrap(), png(3, 4));
+}
+
+#[test]
+fn tar_gz_from_macos_tar_skips_appledouble_and_dot_prefix() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = write_file(
+        dir.path(),
+        "mac.tgz",
+        &tar_gz_bytes(&[
+            ("./p1.png", png(1, 2)),
+            ("./._p1.png", b"appledouble".to_vec()),
+            ("./ch1/p2.png", png(3, 4)),
+        ]),
+    );
+    let base = temp_base();
+    let source = open_source(&path, base.path()).unwrap();
+    assert_eq!(sorted_list(source.as_ref()), ["ch1/p2.png", "p1.png"]);
+}
+
+#[test]
+fn tar_gz_never_writes_outside_its_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = write_file(
+        dir.path(),
+        "evil.tgz",
+        &tar_gz_bytes(&[("../evil.png", png(1, 1)), ("ok.png", png(2, 2))]),
+    );
+    let base = temp_base();
+    let source = open_source(&path, base.path()).unwrap();
+    assert_eq!(source.list().unwrap(), ["ok.png"]);
+    assert!(!base.path().join("evil.png").exists());
+    // The archive's own folder is book-*/ under base, so "../evil.png" would land in base.
+    for entry in std::fs::read_dir(base.path()).unwrap() {
+        assert_ne!(entry.unwrap().file_name(), "evil.png");
+    }
+}
+
+#[test]
+fn tar_gz_folder_is_deleted_on_drop() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = write_file(dir.path(), "book.tgz", &tar_gz_bytes(&[("p1.png", png(1, 2))]));
+    let base = temp_base();
+    let source = open_source(&path, base.path()).unwrap();
+    assert_eq!(std::fs::read_dir(base.path()).unwrap().count(), 1);
+    drop(source);
+    assert_eq!(std::fs::read_dir(base.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn damaged_tar_gz_is_corrupt() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut data = tar_gz_bytes(&[("p1.png", vec![7u8; 4000])]);
+    data.truncate(data.len() / 2);
+    let path = write_file(dir.path(), "broken.tgz", &data);
+    let base = temp_base();
+    assert!(matches!(open_source(&path, base.path()), Err(SourceError::Corrupt(_))));
+}

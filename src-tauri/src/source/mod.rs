@@ -1,8 +1,10 @@
 //! Page sources: a folder, a zip, or an archive extracted to a temporary folder.
 
+mod extract;
 mod folder;
 mod zip_source;
 
+pub use extract::ExtractedSource;
 pub use folder::FolderSource;
 pub use zip_source::ZipSource;
 
@@ -115,11 +117,12 @@ pub fn safe_relative_path(name: &str) -> Option<PathBuf> {
     (!out.as_os_str().is_empty()).then_some(out)
 }
 
-pub fn open_source(path: &Path, _temp_base: &Path) -> Result<Box<dyn PageSource>, SourceError> {
+pub fn open_source(path: &Path, temp_base: &Path) -> Result<Box<dyn PageSource>, SourceError> {
     match detect(path)? {
         SourceKind::Folder => Ok(Box::new(FolderSource::new(path))),
         SourceKind::Zip => Ok(Box::new(ZipSource::open(path)?)),
-        _ => Err(SourceError::Unsupported),
+        SourceKind::TarGz => Ok(Box::new(ExtractedSource::from_tar_gz(path, temp_base)?)),
+        SourceKind::Rar => Err(SourceError::Unsupported),
     }
 }
 
