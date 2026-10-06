@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
+import { setupDragDrop } from "./dragdrop";
 import { Fullscreen } from "./fullscreen";
 import { keyAction } from "./keys";
 import { formatCounter, openingLabel } from "./text";
@@ -121,6 +122,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 applyZoom(zoom);
+void setupDragDrop((path) => void openPath(path));
 
 async function openPending(): Promise<void> {
   const path = await invoke<string | null>("take_pending_open");

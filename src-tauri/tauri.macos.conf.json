@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "fileAssociations": [
+      { "ext": ["cbz", "zip"], "name": "Zip Comic", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["cbr", "rar"], "name": "RAR Comic", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["tgz", "gz"], "name": "Gzip Tarball", "role": "Viewer", "rank": "Alternate" },
+      { "ext": [], "contentTypes": ["public.folder"], "name": "Folder", "role": "Viewer", "rank": "Alternate" }
+    ]
+  }
+}
