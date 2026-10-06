@@ -1,5 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { captureAnchor, currentPageIndex, restoreScrollTop, type PageBox } from "./layout";
+import { captureAnchor, currentPageIndex, restoreScrollTop, type Anchor, type PageBox } from "./layout";
 import type { BookInfo } from "./types";
 
 const UNKNOWN_RATIO = "2 / 3";
@@ -15,6 +15,8 @@ export class Viewer {
   private pages: HTMLElement[] = [];
   private book: BookInfo | null = null;
   private frame = 0;
+  private lastAnchor: Anchor | null = null;
+  private lastWidth = 0;
 
   constructor(scroller: HTMLElement, column: HTMLElement) {
     this.scroller = scroller;
@@ -24,7 +26,7 @@ export class Viewer {
       rootMargin: LOAD_MARGIN,
     });
     scroller.addEventListener("scroll", () => this.scheduleUpdate(), { passive: true });
-    new ResizeObserver(() => this.scheduleUpdate()).observe(scroller);
+    new ResizeObserver(() => this.onResize()).observe(scroller);
   }
 
   show(book: BookInfo): void {
@@ -60,6 +62,7 @@ export class Viewer {
     this.column.appendChild(fragment);
     this.pages.forEach((el) => this.observer.observe(el));
     this.scroller.scrollTo(0, 0);
+    this.lastWidth = this.scroller.clientWidth;
     this.scheduleUpdate();
   }
 
@@ -69,6 +72,8 @@ export class Viewer {
     this.column.replaceChildren();
     this.pages = [];
     this.book = null;
+    this.lastAnchor = null;
+    this.lastWidth = this.scroller.clientWidth;
   }
 
   setZoom(zoom: number): void {
@@ -76,6 +81,20 @@ export class Viewer {
     document.documentElement.style.setProperty("--zoom", String(zoom));
     if (anchor) {
       this.scroller.scrollTop = restoreScrollTop(anchor, this.boxes(), this.scroller.clientHeight);
+    }
+    this.lastAnchor = captureAnchor(this.boxes(), this.scroller.scrollTop, this.scroller.clientHeight);
+    this.lastWidth = this.scroller.clientWidth;
+    this.scheduleUpdate();
+  }
+
+  /** Page heights follow the column width, so keep the same page at the center. */
+  private onResize(): void {
+    const width = this.scroller.clientWidth;
+    if (width !== this.lastWidth) {
+      this.lastWidth = width;
+      if (this.lastAnchor) {
+        this.scroller.scrollTop = restoreScrollTop(this.lastAnchor, this.boxes(), this.scroller.clientHeight);
+      }
     }
     this.scheduleUpdate();
   }
@@ -103,6 +122,10 @@ export class Viewer {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
+      // Skip the capture while a width change is pending: the layout is new, scrollTop is old.
+      if (this.scroller.clientWidth === this.lastWidth) {
+        this.lastAnchor = captureAnchor(this.boxes(), this.scroller.scrollTop, this.scroller.clientHeight);
+      }
       const total = this.pages.length;
       const center = this.scroller.scrollTop + this.scroller.clientHeight / 2;
       const index = currentPageIndex(this.boxes(), center);
