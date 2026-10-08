@@ -27,12 +27,16 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: var(--panel);
-  border-bottom: 1px solid #000;
-  flex: none;
+  background: transparent;
   z-index: 10;
-  position: relative;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
+/* The zoom controls show only while the pointer is over the toolbar. */
+#zoom-out, #zoom-label, #zoom-in { opacity: 0; transition: opacity 0.15s; }
+#toolbar:hover :is(#zoom-out, #zoom-label, #zoom-in) { opacity: 1; }
 
 button {
   background: #2a2c31;
@@ -46,7 +50,15 @@ button {
 button:hover { background: #34373d; }
 
 #toolbar .spacer { flex: 1; }
-#zoom-label { min-width: 44px; text-align: center; color: var(--muted); }
+#zoom-label {
+  min-width: 44px;
+  text-align: center;
+  background: #2a2c31;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+}
 #counter {
   position: absolute;
   left: 50%;
@@ -148,6 +160,7 @@ body.has-book #empty { display: none; }
 body.fullscreen #toolbar {
   position: fixed;
   top: 0;
+  bottom: auto;
   left: 0;
   right: 0;
   transform: translateY(-100%);
