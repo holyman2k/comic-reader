@@ -1,6 +1,6 @@
 # Hold resume position while unknown-size pages load
 
-Status: ready-for-agent
+Status: resolved
 Type: AFK
 Blocked by: 01
 

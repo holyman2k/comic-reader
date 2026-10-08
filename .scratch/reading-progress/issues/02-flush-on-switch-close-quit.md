@@ -1,6 +1,6 @@
 # Flush progress on comic switch, window close and quit
 
-Status: ready-for-agent
+Status: resolved
 Type: AFK
 Blocked by: 01
 

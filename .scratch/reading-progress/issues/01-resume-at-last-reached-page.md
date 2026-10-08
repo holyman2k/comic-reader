@@ -1,6 +1,6 @@
 # Resume at last reached page
 
-Status: ready-for-agent
+Status: resolved
 Type: AFK
 Blocked by: None
 

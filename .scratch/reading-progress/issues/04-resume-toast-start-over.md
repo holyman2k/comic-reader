@@ -1,6 +1,6 @@
 # Resume toast with Start over
 
-Status: ready-for-agent
+Status: resolved
 Type: AFK
 Blocked by: 01
 
