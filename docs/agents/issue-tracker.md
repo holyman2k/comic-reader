@@ -14,6 +14,10 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 
 Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
 
+## Closing a ticket
+
+When a ticket's work is built, reviewed and committed, set its `Status:` line to `resolved`. A skill that implements tickets (such as `/implement`) does this itself, in the same commit as the work. Leave a ticket open if its work is unfinished.
+
 ## When a skill says "fetch the relevant ticket"
 
 Read the file at the referenced path. The user will normally pass the path or the issue number directly.
