@@ -110,6 +110,21 @@ body.has-book #empty { display: none; }
 }
 #status.error { border-color: var(--error); color: var(--error); cursor: pointer; }
 
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  z-index: 20;
+}
+
 #counter-overlay {
   display: none;
   position: fixed;

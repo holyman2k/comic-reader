@@ -43,6 +43,10 @@ impl PageSource for ExtractedSource {
     fn read_prefix(&self, path: &str, limit: usize) -> Result<Vec<u8>, SourceError> {
         self.inner.read_prefix(path, limit)
     }
+
+    fn size(&self, path: &str) -> Result<u64, SourceError> {
+        self.inner.size(path)
+    }
 }
 
 fn new_book_dir(temp_base: &Path) -> io::Result<TempDir> {

@@ -52,6 +52,10 @@ impl PageSource for FolderSource {
         fs::read(self.resolve(path)?).map_err(|e| not_found_or_io(path, e))
     }
 
+    fn size(&self, path: &str) -> Result<u64, SourceError> {
+        fs::metadata(self.resolve(path)?).map(|m| m.len()).map_err(|e| not_found_or_io(path, e))
+    }
+
     fn read_prefix(&self, path: &str, limit: usize) -> Result<Vec<u8>, SourceError> {
         let file = File::open(self.resolve(path)?).map_err(|e| not_found_or_io(path, e))?;
         let mut buf = Vec::new();

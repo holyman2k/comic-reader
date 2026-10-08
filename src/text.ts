@@ -11,3 +11,7 @@ export function openingLabel(path: string): string {
 export function formatCounter(current: number, total: number): string {
   return total > 0 ? `${current} / ${total}` : "";
 }
+
+export function resumeToastText(page: number): string {
+  return `Resumed at page ${page}`;
+}

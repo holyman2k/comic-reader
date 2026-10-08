@@ -46,6 +46,8 @@ pub trait PageSource: Send + Sync {
     fn read(&self, path: &str) -> Result<Vec<u8>, SourceError>;
     /// Reads at most `limit` bytes from the start of the file.
     fn read_prefix(&self, path: &str, limit: usize) -> Result<Vec<u8>, SourceError>;
+    /// Byte size of the file, without reading it.
+    fn size(&self, path: &str) -> Result<u64, SourceError>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

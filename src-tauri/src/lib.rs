@@ -1,8 +1,10 @@
 pub mod book;
 mod commands;
+pub mod fingerprint;
 pub mod image_entry;
 pub mod launch_open;
 pub mod natural_sort;
+pub mod progress;
 pub mod protocol;
 pub mod source;
 pub mod state;
@@ -33,6 +35,12 @@ fn open_main_window(app: &tauri::AppHandle) {
     }
 }
 
+fn flush_progress(app: &tauri::AppHandle) {
+    if let Some(progress) = app.try_state::<progress::ProgressTracker>() {
+        progress.flush();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let base = temp::default_base();
@@ -43,6 +51,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::new(instance))
         .manage(PendingOpen::default())
+        .setup(|app| {
+            let dir = app.path().app_data_dir()?;
+            app.manage(progress::ProgressTracker::new(progress::default_file(&dir)));
+            Ok(())
+        })
         .register_asynchronous_uri_scheme_protocol("comic", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             let path = request.uri().path().to_owned();
@@ -53,12 +66,26 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::open_book,
+            commands::report_progress,
+            commands::flush_progress,
             commands::take_pending_open
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
     app.run(|app, event| match event {
+        // Progress is flushed when a window goes, so a macOS app that stays alive keeps it.
+        tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::Destroyed, .. } => {
+            flush_progress(app);
+        }
+        // On macOS the app stays open after its last window closes.
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::ExitRequested { code: None, api, .. } => {
+            api.prevent_exit();
+            flush_progress(app);
+            app.state::<AppState>().close_book();
+        }
+        tauri::RunEvent::ExitRequested { .. } => flush_progress(app),
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Opened { urls } => {
             if let Some(path) = urls.iter().find_map(|url| url.to_file_path().ok()) {
@@ -71,15 +98,12 @@ pub fn run() {
                 }
             }
         }
-        // On macOS the app stays open after its last window closes.
-        #[cfg(target_os = "macos")]
-        tauri::RunEvent::ExitRequested { code: None, api, .. } => {
-            api.prevent_exit();
-            app.state::<AppState>().close_book();
-        }
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Reopen { .. } => open_main_window(app),
-        tauri::RunEvent::Exit => app.state::<AppState>().shutdown(),
+        tauri::RunEvent::Exit => {
+            flush_progress(app);
+            app.state::<AppState>().shutdown();
+        }
         _ => {}
     });
 }

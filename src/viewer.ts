@@ -1,4 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { atBottom } from "./progress";
 import { captureAnchor, currentPageIndex, restoreScrollTop, type Anchor, type PageBox } from "./layout";
 import type { BookInfo } from "./types";
 
@@ -8,6 +9,10 @@ const LOAD_MARGIN = "200% 0px";
 
 export class Viewer {
   onPageChange: (current: number, total: number) => void = () => {};
+  /** The restore is done: the page at the viewport top, and whether the bottom is showing. */
+  onSettled: (reachedIndex: number, bottom: boolean) => void = () => {};
+  /** After `onSettled`, on every update: the page at the viewport top. */
+  onReach: (reachedIndex: number, bottom: boolean) => void = () => {};
 
   private readonly scroller: HTMLElement;
   private readonly column: HTMLElement;
@@ -17,6 +22,9 @@ export class Viewer {
   private frame = 0;
   private lastAnchor: Anchor | null = null;
   private lastWidth = 0;
+  private settled = false;
+  /** Page whose top is kept at the viewport top while pages above it load. */
+  private holdIndex: number | null = null;
 
   constructor(scroller: HTMLElement, column: HTMLElement) {
     this.scroller = scroller;
@@ -27,9 +35,15 @@ export class Viewer {
     });
     scroller.addEventListener("scroll", () => this.scheduleUpdate(), { passive: true });
     new ResizeObserver(() => this.onResize()).observe(scroller);
+    // The first reader input ends the position correction.
+    for (const type of ["wheel", "touchstart", "pointerdown"]) {
+      scroller.addEventListener(type, () => this.releaseHold(), { passive: true });
+    }
+    document.addEventListener("keydown", () => this.releaseHold());
   }
 
-  show(book: BookInfo): void {
+  /** Opens `book` with the page at `startIndex` at the viewport top. */
+  show(book: BookInfo, startIndex = 0): void {
     this.clear();
     this.book = book;
     const fragment = document.createDocumentFragment();
@@ -48,6 +62,7 @@ export class Viewer {
         if (!page.width || !page.height) {
           el.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
         }
+        this.holdPosition(index);
       });
       img.addEventListener("error", () => {
         if (!img.getAttribute("src")) return;
@@ -61,7 +76,8 @@ export class Viewer {
     });
     this.column.appendChild(fragment);
     this.pages.forEach((el) => this.observer.observe(el));
-    this.scroller.scrollTo(0, 0);
+    this.scrollToPage(startIndex);
+    this.holdIndex = startIndex > 0 ? startIndex : null;
     this.scroller.focus({ preventScroll: true });
     this.lastWidth = this.scroller.clientWidth;
     this.scheduleUpdate();
@@ -75,9 +91,31 @@ export class Viewer {
     this.book = null;
     this.lastAnchor = null;
     this.lastWidth = this.scroller.clientWidth;
+    this.settled = false;
+    this.holdIndex = null;
+  }
+
+  /** Scrolls so the top of page `index` meets the top of the viewport. */
+  scrollToPage(index: number): void {
+    this.holdIndex = null;
+    const el = this.pages[index];
+    this.scroller.scrollTop = el ? el.offsetTop : 0;
+  }
+
+  /** Pages above the held page changed height: put its top back at the viewport top. */
+  private holdPosition(changed: number): void {
+    const held = this.holdIndex;
+    if (held === null || changed >= held) return;
+    const el = this.pages[held];
+    if (el) this.scroller.scrollTop = el.offsetTop;
+  }
+
+  private releaseHold(): void {
+    this.holdIndex = null;
   }
 
   setZoom(zoom: number): void {
+    this.holdIndex = null;
     const anchor = captureAnchor(this.boxes(), this.scroller.scrollTop, this.scroller.clientHeight);
     document.documentElement.style.setProperty("--zoom", String(zoom));
     if (anchor) {
@@ -93,6 +131,7 @@ export class Viewer {
     const width = this.scroller.clientWidth;
     if (width !== this.lastWidth) {
       this.lastWidth = width;
+      this.holdIndex = null;
       if (this.lastAnchor) {
         this.scroller.scrollTop = restoreScrollTop(this.lastAnchor, this.boxes(), this.scroller.clientHeight);
       }
@@ -119,6 +158,21 @@ export class Viewer {
     }
   }
 
+  /** The reached page is the one at the top edge of the viewport. */
+  private reportReach(): void {
+    if (this.pages.length === 0) return;
+    const { scrollTop, clientHeight, scrollHeight } = this.scroller;
+    // One pixel of slack: a restored scrollTop can round just below the page top.
+    const reached = currentPageIndex(this.boxes(), scrollTop + 1);
+    const bottom = atBottom(scrollTop, clientHeight, scrollHeight);
+    if (this.settled) {
+      this.onReach(reached, bottom);
+    } else {
+      this.settled = true;
+      this.onSettled(reached, bottom);
+    }
+  }
+
   private scheduleUpdate(): void {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => {
@@ -131,6 +185,7 @@ export class Viewer {
       const center = this.scroller.scrollTop + this.scroller.clientHeight / 2;
       const index = currentPageIndex(this.boxes(), center);
       this.onPageChange(index + 1, total);
+      this.reportReach();
     });
   }
 }

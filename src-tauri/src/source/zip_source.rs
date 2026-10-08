@@ -12,6 +12,7 @@ pub struct ZipSource {
     archive: Mutex<ZipArchive<File>>,
     names: Vec<String>,
     index: HashMap<String, usize>,
+    sizes: HashMap<String, u64>,
 }
 
 fn map_zip_error(err: ZipError) -> SourceError {
@@ -30,6 +31,7 @@ impl ZipSource {
         let mut archive = ZipArchive::new(File::open(path)?).map_err(map_zip_error)?;
         let mut names = Vec::new();
         let mut index = HashMap::new();
+        let mut sizes = HashMap::new();
         for i in 0..archive.len() {
             // by_index fails with PASSWORD_REQUIRED for encrypted entries.
             let entry = archive.by_index(i).map_err(map_zip_error)?;
@@ -41,9 +43,10 @@ impl ZipSource {
                 continue;
             }
             index.insert(name.clone(), i);
+            sizes.insert(name.clone(), entry.size());
             names.push(name);
         }
-        Ok(Self { archive: Mutex::new(archive), names, index })
+        Ok(Self { archive: Mutex::new(archive), names, index, sizes })
     }
 
     fn read_limited(&self, path: &str, limit: Option<usize>) -> Result<Vec<u8>, SourceError> {
@@ -73,5 +76,9 @@ impl PageSource for ZipSource {
 
     fn read_prefix(&self, path: &str, limit: usize) -> Result<Vec<u8>, SourceError> {
         self.read_limited(path, Some(limit))
+    }
+
+    fn size(&self, path: &str) -> Result<u64, SourceError> {
+        self.sizes.get(path).copied().ok_or_else(|| SourceError::NotFound(path.to_owned()))
     }
 }

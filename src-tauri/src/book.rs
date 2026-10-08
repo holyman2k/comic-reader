@@ -1,11 +1,12 @@
 //! A book: the sorted, sized pages of one source.
 
+use crate::fingerprint::fingerprint;
 use crate::image_entry::{is_page_entry, page_size};
 use crate::natural_sort::natural_cmp;
 use crate::source::{open_source, PageSource, SourceError};
 use serde::Serialize;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Header bytes read first, then once more if the size is not found (large EXIF blocks).
 const PROBE_LIMITS: [usize; 2] = [64 * 1024, 1024 * 1024];
@@ -24,6 +25,16 @@ pub struct BookInfo {
     pub book_id: u64,
     pub title: String,
     pub pages: Vec<PageInfo>,
+    pub fingerprint: String,
+    /// Where to resume. Set when the open command finds stored progress.
+    pub resume: Option<Resume>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Resume {
+    pub page_index: usize,
+    pub finished: bool,
 }
 
 #[derive(Debug)]
@@ -61,6 +72,8 @@ pub struct Book {
     pub id: u64,
     pub title: String,
     pages: Vec<PageInfo>,
+    fingerprint: String,
+    source_path: PathBuf,
     source: Box<dyn PageSource>,
 }
 
@@ -77,18 +90,48 @@ impl Book {
             return Err(OpenError::NoImages);
         }
         names.sort_by(|a, b| natural_cmp(a, b));
-        let pages = names
+        let pages: Vec<PageInfo> = names
             .into_iter()
             .map(|name| {
                 let size = probe_size(source.as_ref(), &name);
                 PageInfo { width: size.map(|s| s.0), height: size.map(|s| s.1), name }
             })
             .collect();
-        Ok(Book { id, title: title_from_path(path), pages, source })
+        let sized = pages
+            .iter()
+            // A page whose size cannot be read must not stop the comic from opening.
+            .map(|page| (page.name.clone(), source.size(&page.name).unwrap_or(0)))
+            .collect::<Vec<_>>();
+        Ok(Book {
+            id,
+            title: title_from_path(path),
+            pages,
+            fingerprint: fingerprint(&sized),
+            source_path: path.to_path_buf(),
+            source,
+        })
     }
 
     pub fn info(&self) -> BookInfo {
-        BookInfo { book_id: self.id, title: self.title.clone(), pages: self.pages.clone() }
+        BookInfo {
+            book_id: self.id,
+            title: self.title.clone(),
+            pages: self.pages.clone(),
+            fingerprint: self.fingerprint.clone(),
+            resume: None,
+        }
+    }
+
+    pub fn fingerprint(&self) -> &str {
+        &self.fingerprint
+    }
+
+    pub fn source_path(&self) -> &Path {
+        &self.source_path
+    }
+
+    pub fn page_names(&self) -> Vec<String> {
+        self.pages.iter().map(|p| p.name.clone()).collect()
     }
 
     pub fn page_count(&self) -> usize {

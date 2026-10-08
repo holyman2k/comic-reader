@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayName, formatCounter, openingLabel } from "./text";
+import { displayName, formatCounter, openingLabel, resumeToastText } from "./text";
 
 describe("text", () => {
   it("takes the last path segment on both platforms", () => {
@@ -20,5 +20,11 @@ describe("text", () => {
   it("formats the page counter", () => {
     expect(formatCounter(12, 48)).toBe("12 / 48");
     expect(formatCounter(0, 0)).toBe("");
+  });
+});
+
+describe("resumeToastText", () => {
+  it("names the page", () => {
+    expect(resumeToastText(12)).toBe("Resumed at page 12");
   });
 });

@@ -127,3 +127,48 @@ fn titles_strip_archive_extensions() {
     assert_eq!(title_from_path(Path::new("/a/One.Piece.cbr")), "One.Piece");
     assert_eq!(title_from_path(Path::new("/a/notes.txt")), "notes.txt");
 }
+
+#[test]
+fn zip_and_unzipped_folder_share_a_fingerprint() {
+    let files = [("Comic/001.png", png(10, 20)), ("Comic/002.png", png(10, 30))];
+    let base = temp_base();
+    let work = tempfile::tempdir().unwrap();
+    let archive = work.path().join("comic.cbz");
+    std::fs::write(&archive, zip_bytes(&files)).unwrap();
+    let folder = work.path().join("unzipped");
+    write_folder(&folder, &[("001.png", png(10, 20)), ("002.png", png(10, 30))]);
+
+    let from_zip = Book::open(&archive, 1, base.path()).unwrap();
+    let from_folder = Book::open(&folder, 2, base.path()).unwrap();
+    assert_eq!(from_zip.fingerprint(), from_folder.fingerprint());
+    assert_eq!(from_zip.info().fingerprint, from_zip.fingerprint());
+}
+
+#[test]
+fn tar_gz_book_matches_the_same_folder() {
+    let files = [("a/1.png", png(4, 4)), ("a/2.png", png(5, 5))];
+    let base = temp_base();
+    let work = tempfile::tempdir().unwrap();
+    let archive = work.path().join("comic.tar.gz");
+    std::fs::write(&archive, tar_gz_bytes(&files)).unwrap();
+    let folder = work.path().join("plain");
+    write_folder(&folder, &[("1.png", png(4, 4)), ("2.png", png(5, 5))]);
+
+    let a = Book::open(&archive, 1, base.path()).unwrap();
+    let b = Book::open(&folder, 2, base.path()).unwrap();
+    assert_eq!(a.fingerprint(), b.fingerprint());
+}
+
+#[test]
+fn changing_a_page_changes_the_fingerprint() {
+    let base = temp_base();
+    let one = tempfile::tempdir().unwrap();
+    let two = tempfile::tempdir().unwrap();
+    write_folder(one.path(), &[("1.png", png(4, 4))]);
+    let mut longer = png(4, 4);
+    longer.push(0);
+    write_folder(two.path(), &[("1.png", longer)]);
+    let a = Book::open(one.path(), 1, base.path()).unwrap();
+    let b = Book::open(two.path(), 2, base.path()).unwrap();
+    assert_ne!(a.fingerprint(), b.fingerprint());
+}
