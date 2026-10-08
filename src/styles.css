@@ -31,6 +31,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   border-bottom: 1px solid #000;
   flex: none;
   z-index: 10;
+  position: relative;
 }
 
 button {
@@ -46,7 +47,14 @@ button:hover { background: #34373d; }
 
 #toolbar .spacer { flex: 1; }
 #zoom-label { min-width: 44px; text-align: center; color: var(--muted); }
-#counter { min-width: 70px; text-align: right; color: var(--muted); }
+#counter {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 70px;
+  text-align: center;
+  color: var(--muted);
+}
 
 #scroller { position: relative; flex: 1; overflow: auto; }
 #scroller:focus { outline: none; }
