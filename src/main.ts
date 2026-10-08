@@ -6,7 +6,14 @@ import { setupDragDrop } from "./dragdrop";
 import { Fullscreen } from "./fullscreen";
 import { keyAction } from "./keys";
 import { ProgressReporter, resumeIndex } from "./progress";
-import { formatCounter, openingLabel, resumeToastText } from "./text";
+import {
+  finishedDetail,
+  finishedTitle,
+  formatCounter,
+  openingLabel,
+  resumeToastText,
+  shortcutLabel,
+} from "./text";
 import { setCounter, setupToolbar, setZoomLabel } from "./toolbar";
 import { SUPERSEDED, type BookInfo } from "./types";
 import { Viewer } from "./viewer";
@@ -68,6 +75,8 @@ function hideToast(): void {
 
 function showResumeToast(pageIndex: number): void {
   byId("toast-text").textContent = resumeToastText(pageIndex + 1);
+  toast.hidden = true;
+  void toast.offsetWidth; // restarts the timer line when a toast is already showing
   toast.hidden = false;
   window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(hideToast, TOAST_VISIBLE_MS);
@@ -78,6 +87,12 @@ byId("toast-action").addEventListener("click", () => {
   viewer.scrollToPage(0); // the normal save then stores page 1
   hideToast();
 });
+
+byId("read-again").addEventListener("mousedown", (e) => e.preventDefault());
+byId("read-again").addEventListener("click", () => viewer.scrollToPage(0));
+
+byId("key-open-file").textContent = shortcutLabel("O", false, isMac);
+byId("key-open-folder").textContent = shortcutLabel("O", true, isMac);
 
 /** Progress is a convenience: a failed call never reaches the reader. */
 function sendProgress(bookId: number, pageIndex: number, finished: boolean): void {
@@ -107,6 +122,8 @@ export async function openPath(path: string): Promise<void> {
     const start = resumeIndex(book.resume, book.pages.length);
     viewer.show(book, start);
     if (start > 0) showResumeToast(start);
+    byId("end-title").textContent = finishedTitle(book.title);
+    byId("end-detail").textContent = finishedDetail(book.pages.length);
     document.body.classList.add("has-book");
     await getCurrentWindow().setTitle(`${book.title} — Comic Reader`);
   } catch (err) {
@@ -147,7 +164,7 @@ setupToolbar({
 viewer.onPageChange = (current, total) => setCounter(formatCounter(current, total));
 
 document.addEventListener("keydown", (e) => {
-  const action = keyAction({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, isMac });
+  const action = keyAction({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, isMac });
   if (!action) return;
   e.preventDefault();
   switch (action) {
@@ -159,6 +176,12 @@ document.addEventListener("keydown", (e) => {
       break;
     case "zoom-reset":
       applyZoom(ZOOM_DEFAULT);
+      break;
+    case "open-file":
+      void chooseFile();
+      break;
+    case "open-folder":
+      void chooseFolder();
       break;
     case "fullscreen":
       void fullscreen.toggle();

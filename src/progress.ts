@@ -3,9 +3,9 @@ import type { Resume } from "./types";
 /** Pixels of slack for fractional scroll positions. */
 const BOTTOM_EPSILON = 2;
 
-/** True when the viewport shows the end of the content. */
-export function atBottom(scrollTop: number, clientHeight: number, scrollHeight: number): boolean {
-  return scrollTop + clientHeight >= scrollHeight - BOTTOM_EPSILON;
+/** True when the viewport shows `contentEnd`, the bottom of the last page. */
+export function atBottom(scrollTop: number, clientHeight: number, contentEnd: number): boolean {
+  return scrollTop + clientHeight >= contentEnd - BOTTOM_EPSILON;
 }
 
 /** Page index to open at: the saved page, or the first page for a new or finished comic. */

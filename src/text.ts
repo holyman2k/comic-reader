@@ -13,5 +13,20 @@ export function formatCounter(current: number, total: number): string {
 }
 
 export function resumeToastText(page: number): string {
-  return `Resumed at page ${page}`;
+  return `Back at page ${page}`;
+}
+
+export function finishedTitle(title: string): string {
+  return `Finished ${title}`;
+}
+
+export function finishedDetail(pageCount: number): string {
+  const pages = pageCount === 1 ? "1 page" : `${pageCount} pages`;
+  return `${pages}. Next time it opens at page 1.`;
+}
+
+/** Shortcut labels as the platform writes them. */
+export function shortcutLabel(key: string, shift: boolean, isMac: boolean): string {
+  if (isMac) return `${shift ? "⇧" : ""}⌘${key}`;
+  return `Ctrl+${shift ? "Shift+" : ""}${key}`;
 }

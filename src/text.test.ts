@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { displayName, formatCounter, openingLabel, resumeToastText } from "./text";
+import {
+  displayName,
+  finishedDetail,
+  finishedTitle,
+  formatCounter,
+  openingLabel,
+  resumeToastText,
+  shortcutLabel,
+} from "./text";
 
 describe("text", () => {
   it("takes the last path segment on both platforms", () => {
@@ -25,6 +33,23 @@ describe("text", () => {
 
 describe("resumeToastText", () => {
   it("names the page", () => {
-    expect(resumeToastText(12)).toBe("Resumed at page 12");
+    expect(resumeToastText(12)).toBe("Back at page 12");
+  });
+});
+
+describe("finished text", () => {
+  it("names the comic and the page count", () => {
+    expect(finishedTitle("Saga Vol 1")).toBe("Finished Saga Vol 1");
+    expect(finishedDetail(48)).toBe("48 pages. Next time it opens at page 1.");
+    expect(finishedDetail(1)).toBe("1 page. Next time it opens at page 1.");
+  });
+});
+
+describe("shortcutLabel", () => {
+  it("uses symbols on macOS and words elsewhere", () => {
+    expect(shortcutLabel("O", false, true)).toBe("⌘O");
+    expect(shortcutLabel("O", true, true)).toBe("⇧⌘O");
+    expect(shortcutLabel("O", false, false)).toBe("Ctrl+O");
+    expect(shortcutLabel("O", true, false)).toBe("Ctrl+Shift+O");
   });
 });

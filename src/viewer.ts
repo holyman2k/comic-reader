@@ -25,6 +25,7 @@ export class Viewer {
   private settled = false;
   /** Page whose top is kept at the viewport top while pages above it load. */
   private holdIndex: number | null = null;
+  private retries = 0;
 
   constructor(scroller: HTMLElement, column: HTMLElement) {
     this.scroller = scroller;
@@ -51,6 +52,7 @@ export class Viewer {
       const el = document.createElement("div");
       el.className = "page";
       el.dataset.index = String(index);
+      el.dataset.number = String(index + 1);
       el.style.aspectRatio = page.width && page.height ? `${page.width} / ${page.height}` : UNKNOWN_RATIO;
 
       const img = document.createElement("img");
@@ -58,7 +60,9 @@ export class Viewer {
       img.decoding = "async";
       img.draggable = false;
       img.addEventListener("load", () => {
-        el.classList.remove("failed");
+        el.classList.remove("loading", "failed");
+        el.classList.add("loaded");
+        el.querySelector(".page-error")?.remove();
         if (!page.width || !page.height) {
           el.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
         }
@@ -66,8 +70,9 @@ export class Viewer {
       });
       img.addEventListener("error", () => {
         if (!img.getAttribute("src")) return;
+        el.classList.remove("loading");
         el.classList.add("failed");
-        el.dataset.message = `Page ${index + 1} could not be loaded (${page.name})`;
+        if (!el.querySelector(".page-error")) el.appendChild(this.errorCard(el, img, index, page.name));
       });
 
       el.appendChild(img);
@@ -93,6 +98,37 @@ export class Viewer {
     this.lastWidth = this.scroller.clientWidth;
     this.settled = false;
     this.holdIndex = null;
+  }
+
+  /** The card a failed page shows in place of its image. */
+  private errorCard(el: HTMLElement, img: HTMLImageElement, index: number, name: string): HTMLElement {
+    const card = document.createElement("div");
+    card.className = "page-error";
+    const icon = document.createElement("span");
+    icon.className = "page-error-icon";
+    icon.textContent = "!";
+    const title = document.createElement("strong");
+    title.textContent = `Page ${index + 1} could not be loaded`;
+    const detail = document.createElement("span");
+    detail.textContent = name;
+    const retry = document.createElement("button");
+    retry.textContent = "Retry";
+    // Keep focus on the page scroller so Space and Enter do not re-click the button.
+    retry.addEventListener("mousedown", (e) => e.preventDefault());
+    retry.addEventListener("click", () => this.load(el, img, index, ++this.retries));
+    card.append(icon, title, detail, retry);
+    return card;
+  }
+
+  /** Starts loading page `index`. A retry count gives a new URL, so a failed response is not reused. */
+  private load(el: HTMLElement, img: HTMLImageElement, index: number, retry = 0): void {
+    const book = this.book;
+    if (!book) return;
+    el.querySelector(".page-error")?.remove();
+    el.classList.remove("failed");
+    el.classList.add("loading");
+    const url = convertFileSrc(`${book.bookId}/${index}`, "comic");
+    img.src = retry ? `${url}?retry=${retry}` : url;
   }
 
   /** Scrolls so the top of page `index` meets the top of the viewport. */
@@ -144,16 +180,16 @@ export class Viewer {
   }
 
   private onIntersect(entries: IntersectionObserverEntry[]): void {
-    const book = this.book;
-    if (!book) return;
+    if (!this.book) return;
     for (const entry of entries) {
       const el = entry.target as HTMLElement;
       const img = el.querySelector("img");
       if (!img) continue;
       if (entry.isIntersecting && !img.getAttribute("src")) {
-        img.src = convertFileSrc(`${book.bookId}/${el.dataset.index}`, "comic");
+        this.load(el, img, Number(el.dataset.index));
       } else if (!entry.isIntersecting && img.getAttribute("src")) {
         img.removeAttribute("src"); // frees the decoded image
+        el.classList.remove("loading", "loaded");
       }
     }
   }
@@ -161,10 +197,13 @@ export class Viewer {
   /** The reached page is the one at the top edge of the viewport. */
   private reportReach(): void {
     if (this.pages.length === 0) return;
-    const { scrollTop, clientHeight, scrollHeight } = this.scroller;
+    const { scrollTop, clientHeight } = this.scroller;
+    const boxes = this.boxes();
     // One pixel of slack: a restored scrollTop can round just below the page top.
-    const reached = currentPageIndex(this.boxes(), scrollTop + 1);
-    const bottom = atBottom(scrollTop, clientHeight, scrollHeight);
+    const reached = currentPageIndex(boxes, scrollTop + 1);
+    // The end card sits below the last page, so the bottom is the last page's bottom.
+    const last = boxes[boxes.length - 1];
+    const bottom = atBottom(scrollTop, clientHeight, last.top + last.height);
     if (this.settled) {
       this.onReach(reached, bottom);
     } else {
